@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ExamNexus 3D — All Entrance & Competitive Exam Platform</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- React & ReactDOM CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Babel Standalone for JSX in browser -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- Three.js CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  
+  <!-- Canvas Confetti CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.4/dist/confetti.browser.min.js"></script>
+
+  <!-- Tailwind Configuration -->
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Outfit', 'Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            nexus: {
+              bg: '#070a13',
+              cyan: '#00f2fe',
+              blue: '#4facfe',
+              purple: '#7f00ff',
+              emerald: '#10b981',
+              amber: '#f59e0b',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Custom CSS for Glassmorphism & 3D Spatial Transforms -->
+  <style>
+    body {
+      background-color: #070a13;
+      color: #f8fafc;
+      font-family: 'Outfit', sans-serif;
+      overflow-x: hidden;
+    }
+
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .glass-card {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .glass-card:hover {
+      border-color: rgba(0, 242, 254, 0.3);
+      box-shadow: 0 12px 40px 0 rgba(0, 242, 254, 0.15);
+      transform: translateY(-3px);
+    }
+
+    .glass-input {
+      background: rgba(10, 15, 30, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #fff;
+      transition: all 0.2s ease;
+    }
+
+    .glass-input:focus {
+      border-color: #00f2fe;
+      box-shadow: 0 0 15px rgba(0, 242, 254, 0.25);
+      outline: none;
+    }
+
+    /* 3D Spatial Transforms */
+    .perspective-1000 {
+      perspective: 1000px;
+    }
+
+    .transform-style-3d {
+      transform-style: preserve-3d;
+    }
+
+    .backface-hidden {
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+    }
+
+    .rotate-y-180 {
+      transform: rotateY(180deg);
+    }
+
+    .text-gradient-cyan {
+      background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track { background: #070a13; }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(0, 242, 254, 0.4); }
+  </style>
+</head>
+<body class="antialiased selection:bg-cyan-500 selection:text-black">
+
+  <div id="root"></div>
+
+  <!-- APPLICATION SCRIPTS (REACT + THREE.JS + DATA) -->
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // --- DATA REGISTRIES ---
+    const EXAM_CATEGORIES = [
+      {
+        id: 'engineering',
+        name: 'Engineering & Tech',
+        badge: 'Engineering',
+        exams: [
+          { id: 'jee_main', name: 'JEE Main 2026', fullName: 'Joint Entrance Examination (Main)', markingScheme: '+4 for Correct, -1 for Incorrect', durationMinutes: 180, subjects: ['Physics', 'Chemistry', 'Mathematics'], targetLabel: 'Target Percentile: 99.8+' },
+          { id: 'jee_adv', name: 'JEE Advanced', fullName: 'Joint Entrance Examination (Advanced)', markingScheme: '+4/-2 Partial Marking', durationMinutes: 180, subjects: ['Physics', 'Chemistry', 'Mathematics'], targetLabel: 'Target Rank: AIR < 1000' },
+          { id: 'gate', name: 'GATE 2026', fullName: 'Graduate Aptitude Test in Engineering', markingScheme: '+1 / +2 (-0.33/-0.66 MCQ)', durationMinutes: 180, subjects: ['Aptitude', 'Engineering Math', 'Core CS/EC/ME'], targetLabel: 'Target Score: 850+' },
+          { id: 'bitsat', name: 'BITSAT 2026', fullName: 'Birla Institute of Technology Admission Test', markingScheme: '+3 for Correct, -1 for Incorrect', durationMinutes: 180, subjects: ['Physics', 'Chemistry', 'Math', 'English & LR'], targetLabel: 'Target Score: 340+' }
+        ]
+      },
+      {
+        id: 'medical',
+        name: 'Medical & Healthcare',
+        badge: 'Medical',
+        exams: [
+          { id: 'neet_ug', name: 'NEET UG 2026', fullName: 'National Eligibility cum Entrance Test (UG)', markingScheme: '+4 for Correct, -1 for Incorrect', durationMinutes: 200, subjects: ['Botany', 'Zoology', 'Chemistry', 'Physics'], targetLabel: 'Target Score: 680+/720' },
+          { id: 'neet_pg', name: 'NEET PG / INI-CET', fullName: 'Post Graduate Medical Entrance Test', markingScheme: '+4 for Correct, -1 for Incorrect', durationMinutes: 210, subjects: ['Clinical', 'Pre-Clinical', 'Para-Clinical'], targetLabel: 'Target Rank: AIR < 500' }
+        ]
+      },
+      {
+        id: 'civil_services',
+        name: 'Civil Services & Defence',
+        badge: 'Government',
+        exams: [
+          { id: 'upsc_cse', name: 'UPSC CSE (IAS/IPS)', fullName: 'Union Public Service Commission Civil Services', markingScheme: '+2 for Correct (GS), -0.66 Incorrect', durationMinutes: 120, subjects: ['Indian Polity', 'Economy', 'History', 'Geography', 'Science & Tech', 'CSAT'], targetLabel: 'Target GS Cutoff: 110+' },
+          { id: 'nda', name: 'NDA & NA', fullName: 'National Defence Academy Examination', markingScheme: '+2.5 Math / +4 GAT (Negative applicable)', durationMinutes: 150, subjects: ['Mathematics', 'English', 'General Knowledge'], targetLabel: 'Target Score: 450+' }
+        ]
+      },
+      {
+        id: 'management',
+        name: 'Management & Business',
+        badge: 'MBA',
+        exams: [
+          { id: 'cat', name: 'CAT 2026', fullName: 'Common Admission Test (IIMs)', markingScheme: '+3 for Correct, -1 for Incorrect', durationMinutes: 120, subjects: ['VARC', 'DILR', 'Quantitative Aptitude'], targetLabel: 'Target Percentile: 99.5+%ile' }
+        ]
+      },
+      {
+        id: 'law',
+        name: 'Law & Humanities',
+        badge: 'Law',
+        exams: [
+          { id: 'clat', name: 'CLAT 2026', fullName: 'Common Law Admission Test (NLUs)', markingScheme: '+1 for Correct, -0.25 for Incorrect', durationMinutes: 120, subjects: ['Legal Reasoning', 'Logical Reasoning', 'English', 'Current Affairs'], targetLabel: 'Target Rank: Top 100 NLU' }
+        ]
+      },
+      {
+        id: 'banking_gov',
+        name: 'Government & Banking',
+        badge: 'Gov & Bank',
+        exams: [
+          { id: 'ssc_cgl', name: 'SSC CGL 2026', fullName: 'Staff Selection Commission Combined Graduate Level', markingScheme: '+2 for Correct, -0.50 Incorrect', durationMinutes: 60, subjects: ['Reasoning', 'General Awareness', 'Quant', 'English'], targetLabel: 'Target Score: 160+/200' }
+        ]
+      },
+      {
+        id: 'global',
+        name: 'Global & Overseas',
+        badge: 'Global',
+        exams: [
+          { id: 'gre', name: 'GRE General Test', fullName: 'Graduate Record Examination', markingScheme: 'Adaptive Scoring (130-170 scale)', durationMinutes: 115, subjects: ['Verbal Reasoning', 'Quantitative Reasoning', 'AWA Writing'], targetLabel: 'Target GRE Score: 330+' }
+        ]
+      }
+    ];
+
+    const getExamById = (id) => {
+      for (const cat of EXAM_CATEGORIES) {
+        const found = cat.exams.find(e => e.id === id);
+        if (found) return { ...found, categoryId: cat.id, categoryName: cat.name };
+      }
+      return EXAM_CATEGORIES[0].exams[0];
+    };
+
+    const INITIAL_NOTES = [
+      {
+        id: 'note_jee_01',
+        examId: 'jee_main',
+        subject: 'Physics',
+        chapter: 'Modern Physics',
+        title: 'Einstein Photoelectric Equation & De-Broglie Wavelength',
+        readTime: '6 min read',
+        highYieldTag: 'JEE Top 5% Weightage',
+        summary: 'Einstein equation: E = hν = W₀ + K_max. Maximum kinetic energy depends strictly on frequency, not intensity.',
+        content: `### Einstein Photoelectric Equation\n\n$$E = h\\nu = W_0 + K_{\\text{max}}$$\n\n• Work Function ($W_0$): Minimum photon energy to eject photoelectrons.\n• Stopping Potential ($V_0$): $K_{\\text{max}} = e V_0$.\n\n### De-Broglie Wavelength of Accelerated Electron\n$$\\lambda = \\frac{12.27}{\\sqrt{V}} \\text{ Å}$$`,
+        formulas: ['E = hν = W₀ + K_max', 'K_max = e V₀', 'λ = 12.27 / √V Å'],
+        keyPoints: ['Photocurrent is proportional to light intensity.', 'Stopping potential depends strictly on frequency.', 'Instantaneous process (< 10⁻⁹s).']
+      },
+      {
+        id: 'note_jee_02',
+        examId: 'jee_main',
+        subject: 'Chemistry',
+        chapter: 'Organic Chemistry',
+        title: 'SN1 vs SN2 Substitution Mechanisms',
+        readTime: '8 min read',
+        highYieldTag: 'Guaranteed JEE Question',
+        summary: 'SN1 is 2-step via carbocation intermediate; SN2 is 1-step via transition state with Walden inversion.',
+        content: `### SN1 vs SN2 Comparison\n\n• **SN1**: 2 Steps, Rate = k[R-X], Carbocation intermediate, Racemization, Favored by Polar Protic solvents.\n• **SN2**: 1 Step, Rate = k[R-X][Nu⁻], Walden Inversion, Favored by Polar Aprotic solvents (DMSO, acetone).`,
+        formulas: ['SN1 Rate = k[R-X]', 'SN2 Rate = k[R-X][Nu⁻]'],
+        keyPoints: ['Carbocation rearrangement occurs in SN1 (1,2-hydride / methyl shift).', 'SN2 gives complete 100% inversion of configuration.']
+      },
+      {
+        id: 'note_neet_01',
+        examId: 'neet_ug',
+        subject: 'Botany',
+        chapter: 'Genetics',
+        title: 'DNA Replication & Enzymatic Machinery',
+        readTime: '7 min read',
+        highYieldTag: 'NEET Core Topic',
+        summary: 'DNA Polymerase III synthesizes DNA in 5\' to 3\' direction. Okazaki fragments joined by DNA Ligase.',
+        content: `### Key Enzymes in DNA Replication\n\n• **Helicase**: Unwinds double helix.\n• **DNA Polymerase III**: Elongates new strand 5' → 3'.\n• **DNA Ligase**: Joins Okazaki fragments on lagging strand.`,
+        formulas: ['Replication direction: 5\' → 3\' ALWAYS', 'Proofreading direction: 3\' → 5\''],
+        keyPoints: ['Replication is Semi-Conservative and Semi-Discontinuous.', 'Leading strand is synthesized continuously.']
+      },
+      {
+        id: 'note_upsc_01',
+        examId: 'upsc_cse',
+        subject: 'Indian Polity',
+        chapter: 'Fundamental Rights',
+        title: 'Article 32 — Writs of Supreme Court & High Court',
+        readTime: '10 min read',
+        highYieldTag: 'UPSC High Frequency',
+        summary: 'Article 32 (SC) and Article 226 (HC) empower courts to issue 5 types of constitutional writs.',
+        content: `### 5 Writs of Indian Constitution\n\n1. **Habeas Corpus**: Issued against illegal detention (Public & Private).\n2. **Mandamus**: Command public official to perform statutory duty.\n3. **Prohibition**: Prevent lower court from exceeding jurisdiction.\n4. **Certiorari**: Quash illegal order passed by lower tribunal.\n5. **Quo-Warranto**: Challenge illegal usurpation of public office.`,
+        formulas: ['Article 32: Supreme Court mandatory FR protection', 'Article 226: High Court broader legal protection'],
+        keyPoints: ['Habeas Corpus applies to private individuals.', 'Mandamus cannot be issued against President or Governors.']
+      }
+    ];
+
+    const INITIAL_FLASHCARDS = [
+      { id: 'fc_1', examId: 'jee_main', subject: 'Physics', front: 'Electric Field inside a uniformly charged conducting sphere?', back: 'Zero! Inside any conductor in electrostatic equilibrium, E = 0.', difficulty: 'Medium' },
+      { id: 'fc_2', examId: 'jee_main', subject: 'Mathematics', front: '∫ (e^x)(f(x) + f\'(x)) dx = ?', back: 'e^x · f(x) + C.', difficulty: 'Easy' },
+      { id: 'fc_3', examId: 'neet_ug', subject: 'Botany', front: 'At which stage of Meiosis does Crossing Over occur?', back: 'Pachytene stage of Prophase I.', difficulty: 'Medium' },
+      { id: 'fc_4', examId: 'upsc_cse', subject: 'Indian Polity', front: 'Which 3 words were added to the Preamble by 42nd Amendment (1976)?', back: 'Socialist, Secular, Integrity.', difficulty: 'Medium' },
+      { id: 'fc_5', examId: 'cat', subject: 'Quantitative Aptitude', front: 'Unit digit of 7^2026?', back: 'Cyclicity of 7 is 4. 2026 mod 4 = 2. Unit digit is 7² = 9.', difficulty: 'Hard' }
+    ];
+
+    const MOCK_TESTS = [
+      {
+        id: 'test_jee_01',
+        examId: 'jee_main',
+        title: 'JEE Main 2026 Full Practice Drill',
+        timeLimitMinutes: 15,
+        questions: [
+          { id: 'q1', subject: 'Physics', question: 'An electron is accelerated through a potential difference of 100 V. What is its de-Broglie wavelength?', options: ['A) 1.227 Å', 'B) 12.27 Å', 'C) 0.1227 Å', 'D) 122.7 Å'], correctIndex: 0, explanation: 'λ = 12.27 / √100 = 1.227 Å.' },
+          { id: 'q2', subject: 'Chemistry', question: 'Which compound undergoes SN1 substitution at the fastest rate?', options: ['A) CH3-Cl', 'B) (CH3)2CH-Cl', 'C) (CH3)3C-Cl', 'D) CH3-CH2-Cl'], correctIndex: 2, explanation: '(CH3)3C-Cl forms a highly stable 3° carbocation.' }
+        ]
+      },
+      {
+        id: 'test_neet_01',
+        examId: 'neet_ug',
+        title: 'NEET UG Biology & Physics Challenge',
+        timeLimitMinutes: 15,
+        questions: [
+          { id: 'nq1', subject: 'Botany', question: 'Primary CO2 fixation enzyme in C4 plants is:', options: ['A) RuBisCO', 'B) PEP Carboxylase', 'C) Carbonic Anhydrase', 'D) ATPase'], correctIndex: 1, explanation: 'PEPcase catalyzes initial CO2 fixation in mesophyll cells of C4 plants.' }
+        ]
+      },
+      {
+        id: 'test_upsc_01',
+        examId: 'upsc_cse',
+        title: 'UPSC CSE GS Paper-1 Drill',
+        timeLimitMinutes: 10,
+        questions: [
+          { id: 'uq1', subject: 'Indian Polity', question: 'Which Writ can be issued against private individuals as well as public authorities?', options: ['A) Mandamus', 'B) Habeas Corpus', 'C) Certiorari', 'D) Quo-Warranto'], correctIndex: 1, explanation: 'Habeas Corpus protects against illegal detention by any individual or authority.' }
+        ]
+      }
+    ];
+
+    // --- THREE.JS 3D CANVAS COMPONENT ---
+    const ThreeCanvas = ({ activeCategory }) => {
+      const mountRef = useRef(null);
+
+      useEffect(() => {
+        const container = mountRef.current;
+        if (!container) return;
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 18;
+
+        const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        let colorHex = 0x00f2fe;
+        if (activeCategory === 'medical') colorHex = 0x10b981;
+        if (activeCategory === 'civil_services') colorHex = 0xfbbf24;
+        if (activeCategory === 'management') colorHex = 0xe100ff;
+        if (activeCategory === 'law') colorHex = 0x3b82f6;
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const pointLight = new THREE.PointLight(colorHex, 2, 50);
+        pointLight.position.set(10, 10, 10);
+        scene.add(pointLight);
+
+        // Particle Stars
+        const particleCount = 180;
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(particleCount * 3);
+
+        for (let i = 0; i < particleCount * 3; i++) {
+          positions[i] = (Math.random() - 0.5) * 40;
+        }
+
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const particleMaterial = new THREE.PointsMaterial({ color: colorHex, size: 0.15, transparent: true, opacity: 0.7 });
+        const particles = new THREE.Points(geometry, particleMaterial);
+        scene.add(particles);
+
+        // 3D Polyhedron Mesh
+        const mainGroup = new THREE.Group();
+        const icoGeo = new THREE.IcosahedronGeometry(4, 1);
+        const icoMat = new THREE.MeshStandardMaterial({ color: colorHex, wireframe: true });
+        const icoMesh = new THREE.Mesh(icoGeo, icoMat);
+        mainGroup.add(icoMesh);
+        mainGroup.position.set(7, 0, -2);
+        scene.add(mainGroup);
+
+        let mouseX = 0, mouseY = 0;
+        const handleMouseMove = (e) => {
+          mouseX = (e.clientX / window.innerWidth - 0.5) * 2;
+          mouseY = (e.clientY / window.innerHeight - 0.5) * 2;
+        };
+        window.addEventListener('mousemove', handleMouseMove);
+
+        let animId;
+        const animate = () => {
+          animId = requestAnimationFrame(animate);
+          mainGroup.rotation.x += 0.005;
+          mainGroup.rotation.y += 0.008;
+          particles.rotation.y += 0.0005;
+          camera.position.x += (mouseX * 2 - camera.position.x) * 0.05;
+          camera.position.y += (-mouseY * 2 - camera.position.y) * 0.05;
+          camera.lookAt(scene.position);
+          renderer.render(scene, camera);
+        };
+        animate();
+
+        return () => {
+          cancelAnimationFrame(animId);
+          window.removeEventListener('mousemove', handleMouseMove);
+          if (container.contains(renderer.domElement)) container.removeChild(renderer.domElement);
+          renderer.dispose();
+        };
+      }, [activeCategory]);
+
+      return <div ref={mountRef} className="fixed inset-0 pointer-events-none z-0 overflow-hidden opacity-75" />;
+    };
+
+    // --- MAIN APP COMPONENT ---
+    function App() {
+      const [activeView, setActiveView] = useState('hero');
+      const [currentExamId, setCurrentExamId] = useState('jee_main');
+      const [isModalOpen, setIsModalOpen] = useState(false);
+
+      const [notes, setNotes] = useState(INITIAL_NOTES);
+      const [flashcards, setFlashcards] = useState(INITIAL_FLASHCARDS);
+      const [testHistory, setTestHistory] = useState([]);
+      const [selectedNote, setSelectedNote] = useState(null);
+
+      // Flashcard Deck State
+      const [fcIndex, setFcIndex] = useState(0);
+      const [isFlipped, setIsFlipped] = useState(false);
+
+      // Test Simulator State
+      const [testState, setTestState] = useState('idle'); // idle, running, submitted
+      const [userAnswers, setUserAnswers] = useState({});
+      const [lastResult, setLastResult] = useState(null);
+
+      const currentExam = getExamById(currentExamId);
+
+      const examFilteredNotes = notes.filter(n => n.examId === currentExamId || n.examId === 'all');
+      const examFilteredCards = flashcards.filter(f => f.examId === currentExamId || f.examId === 'all');
+      const currentCard = examFilteredCards[fcIndex] || examFilteredCards[0];
+      const activeTest = MOCK_TESTS.find(t => t.examId === currentExamId) || MOCK_TESTS[0];
+
+      const handleFinishTest = () => {
+        let score = 0;
+        let correct = 0;
+        activeTest.questions.forEach(q => {
+          if (userAnswers[q.id] === q.correctIndex) {
+            score += 4;
+            correct += 1;
+          } else if (userAnswers[q.id] !== undefined) {
+            score -= 1;
+          }
+        });
+
+        const accuracy = Math.round((correct / activeTest.questions.length) * 100);
+        const res = { score, accuracy, total: activeTest.questions.length, correct };
+        setLastResult(res);
+        setTestHistory([res, ...testHistory]);
+        setTestState('submitted');
+
+        if (window.confetti && accuracy >= 50) {
+          window.confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+        }
+      };
+
+      return (
+        <div className="min-h-screen bg-[#070a13] text-slate-100 flex flex-col font-sans relative">
+          
+          <ThreeCanvas activeCategory={currentExam.categoryId} />
+
+          {/* NAVBAR */}
+          <header className="sticky top-0 z-40 w-full glass-panel border-b border-white/10 backdrop-blur-xl">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+              
+              <div className="flex items-center space-x-4">
+                <div onClick={() => setActiveView('hero')} className="flex items-center space-x-3 cursor-pointer">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center font-black text-slate-950 text-xl shadow-lg shadow-cyan-500/30">
+                    ⚡
+                  </div>
+                  <div>
+                    <span className="text-xl font-black text-white">Exam<span className="text-cyan-400">Nexus</span> 3D</span>
+                    <span className="block text-[10px] text-slate-400 tracking-wider uppercase font-semibold">All Entrance Exams</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="hidden sm:flex items-center space-x-2 px-3.5 py-1.5 rounded-2xl glass-panel border border-cyan-500/30 text-cyan-300 text-xs font-bold hover:scale-105 transition-all"
+                >
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                  <span>{currentExam.name}</span>
+                  <span>▼</span>
+                </button>
+              </div>
+
+              {/* NAV TABS */}
+              <nav className="hidden lg:flex items-center space-x-1">
+                {[
+                  { id: 'hero', label: 'Overview' },
+                  { id: 'notes', label: 'Notes Vault' },
+                  { id: 'flashcards', label: '3D Flashcards' },
+                  { id: 'tests', label: 'Test Arena' },
+                  { id: 'analytics', label: 'Analytics' }
+                ].map(item => (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveView(item.id)}
+                    className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all ${
+                      activeView === item.id
+                        ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-lg shadow-cyan-500/10'
+                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </nav>
+
+              <div className="flex items-center space-x-3">
+                <span className="px-3 py-1.5 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold">
+                  🔥 5 Day Streak
+                </span>
+                <button onClick={() => setIsModalOpen(true)} className="lg:hidden text-xs text-cyan-300 font-bold px-3 py-1 bg-cyan-500/20 rounded-xl">
+                  {currentExam.name.split(' ')[0]}
+                </button>
+              </div>
+
+            </div>
+          </header>
+
+          {/* MAIN CONTENT AREA */}
+          <main className="flex-1 z-10">
+            
+            {/* 1. HERO VIEW */}
+            {activeView === 'hero' && (
+              <div className="max-w-7xl mx-auto px-4 py-12 space-y-12">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                  <div className="lg:col-span-7 space-y-6">
+                    <span className="px-4 py-1.5 rounded-full glass-panel border border-cyan-500/30 text-xs font-semibold text-cyan-300">
+                      ⚡ Updated 2026 Entrance Syllabus
+                    </span>
+                    <h1 className="text-4xl sm:text-6xl font-black text-white tracking-tight leading-tight">
+                      Master Competitive Exams with <span className="text-gradient-cyan">3D Visual Learning</span>
+                    </h1>
+                    <p className="text-base text-slate-300">
+                      Prepare for <span className="text-cyan-300 font-bold">{currentExam.name}</span> and 20+ top entrance exams with interactive high-yield notes, spatial 3D flashcards, realistic test simulators, and live performance tracking.
+                    </p>
+                    <div className="flex flex-wrap gap-4 pt-2">
+                      <button onClick={() => setActiveView('tests')} className="px-7 py-4 rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-600 text-slate-950 font-extrabold text-sm shadow-xl shadow-cyan-500/30 hover:scale-105 transition-all">
+                        Start Mock Test →
+                      </button>
+                      <button onClick={() => setActiveView('flashcards')} className="px-7 py-4 rounded-2xl glass-panel border border-white/20 text-white font-bold text-sm hover:bg-white/10 transition-all">
+                        3D Flashcards Deck
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="lg:col-span-5 p-8 rounded-3xl glass-card border border-cyan-500/30 space-y-6 shadow-2xl">
+                    <div className="flex justify-between items-center border-b border-white/10 pb-4">
+                      <div>
+                        <h3 className="text-lg font-bold text-white">{currentExam.name}</h3>
+                        <p className="text-xs text-slate-400">{currentExam.targetLabel}</p>
+                      </div>
+                      <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300">Active</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 text-xs">
+                      <div className="p-3 rounded-2xl bg-white/5">
+                        <span className="block text-slate-400">Duration</span>
+                        <span className="font-bold text-white text-sm">{currentExam.durationMinutes} Mins</span>
+                      </div>
+                      <div className="p-3 rounded-2xl bg-white/5">
+                        <span className="block text-slate-400">Marking</span>
+                        <span className="font-bold text-cyan-300">{currentExam.markingScheme}</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {currentExam.subjects.map((s, idx) => (
+                        <span key={idx} className="px-3 py-1 rounded-xl bg-cyan-500/10 text-cyan-300 text-xs font-semibold">
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 2. NOTES VAULT */}
+            {activeView === 'notes' && (
+              <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
+                <h2 className="text-3xl font-black text-white">Syllabus Notes & Formula Vault</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {examFilteredNotes.map(n => (
+                    <div key={n.id} onClick={() => setSelectedNote(n)} className="p-6 rounded-3xl glass-card cursor-pointer border border-white/10 hover:border-cyan-500/40 space-y-3">
+                      <span className="px-2.5 py-1 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-300 uppercase">{n.subject}</span>
+                      <h3 className="text-lg font-bold text-white">{n.title}</h3>
+                      <p className="text-xs text-slate-300 line-clamp-3">{n.summary}</p>
+                      <span className="text-xs text-cyan-400 font-bold block pt-2">Read Note →</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 3. 3D FLASHCARDS */}
+            {activeView === 'flashcards' && (
+              <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+                <h2 className="text-3xl font-black text-white text-center">3D Spatial Flashcards Deck</h2>
+                {currentCard ? (
+                  <div className="space-y-6">
+                    <div className="w-full h-80 perspective-1000">
+                      <div onClick={() => setIsFlipped(!isFlipped)} className={`relative w-full h-full cursor-pointer transition-transform duration-700 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
+                        {/* FRONT */}
+                        <div className="absolute inset-0 rounded-3xl glass-card border-2 border-purple-500/30 p-8 flex flex-col justify-between backface-hidden bg-slate-900/90 shadow-2xl">
+                          <span className="text-xs font-bold text-purple-300 uppercase">Question (Tap to flip 🔄)</span>
+                          <h3 className="text-xl font-bold text-white text-center">{currentCard.front}</h3>
+                          <span className="text-xs text-slate-400 text-center">Card {fcIndex + 1} of {examFilteredCards.length}</span>
+                        </div>
+                        {/* BACK */}
+                        <div className="absolute inset-0 rounded-3xl glass-card border-2 border-cyan-500/40 p-8 flex flex-col justify-between rotate-y-180 backface-hidden bg-slate-950/95 shadow-2xl">
+                          <span className="text-xs font-bold text-cyan-300 uppercase">Answer ✅</span>
+                          <p className="text-base font-semibold text-slate-100 text-center whitespace-pre-line">{currentCard.back}</p>
+                          <span className="text-xs text-cyan-400 text-center font-bold">Spatial memory recall active</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex justify-center space-x-4">
+                      <button onClick={() => { setIsFlipped(false); setFcIndex((fcIndex - 1 + examFilteredCards.length) % examFilteredCards.length); }} className="px-6 py-3 rounded-2xl glass-panel text-white font-bold text-xs">
+                        ← Previous
+                      </button>
+                      <button onClick={() => { setIsFlipped(false); setFcIndex((fcIndex + 1) % examFilteredCards.length); }} className="px-6 py-3 rounded-2xl bg-purple-500 text-white font-bold text-xs">
+                        Next Card →
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-8 text-center text-slate-400">No flashcards for this exam yet.</div>
+                )}
+              </div>
+            )}
+
+            {/* 4. TEST ARENA */}
+            {activeView === 'tests' && (
+              <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+                {testState === 'idle' && (
+                  <div className="p-8 rounded-3xl glass-card border border-emerald-500/30 text-center space-y-6">
+                    <h2 className="text-3xl font-black text-white">{activeTest.title}</h2>
+                    <p className="text-xs text-slate-400">Simulate actual exam conditions with negative marking ({currentExam.markingScheme}).</p>
+                    <button onClick={() => setTestState('running')} className="px-8 py-4 rounded-2xl bg-emerald-500 text-slate-950 font-black text-sm shadow-lg shadow-emerald-500/20">
+                      Begin Mock Test Now
+                    </button>
+                  </div>
+                )}
+
+                {testState === 'running' && (
+                  <div className="p-8 rounded-3xl glass-card border border-white/10 space-y-6">
+                    <h3 className="text-xl font-bold text-white">{activeTest.questions[0].question}</h3>
+                    <div className="space-y-3">
+                      {activeTest.questions[0].options.map((opt, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => setUserAnswers({ ...userAnswers, [activeTest.questions[0].id]: idx })}
+                          className={`p-4 rounded-2xl border cursor-pointer ${
+                            userAnswers[activeTest.questions[0].id] === idx ? 'border-emerald-400 bg-emerald-950/40 text-emerald-200' : 'border-white/10 bg-white/5'
+                          }`}
+                        >
+                          {opt}
+                        </div>
+                      ))}
+                    </div>
+                    <button onClick={handleFinishTest} className="w-full py-3 rounded-xl bg-emerald-500 text-slate-950 font-bold">
+                      Submit Test & Calculate Score
+                    </button>
+                  </div>
+                )}
+
+                {testState === 'submitted' && lastResult && (
+                  <div className="p-8 rounded-3xl glass-card border border-cyan-500/30 text-center space-y-6">
+                    <h2 className="text-3xl font-black text-white">Scorecard: {lastResult.score} Marks</h2>
+                    <p className="text-sm text-cyan-300 font-bold">Accuracy: {lastResult.accuracy}%</p>
+                    <button onClick={() => setTestState('idle')} className="px-6 py-3 rounded-xl bg-cyan-500 text-slate-950 font-bold">
+                      Retake Test
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 5. ANALYTICS */}
+            {activeView === 'analytics' && (
+              <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+                <h2 className="text-3xl font-black text-white">Performance Records</h2>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="p-6 rounded-3xl glass-card border border-amber-500/30 text-center">
+                    <span className="text-xs text-slate-400 font-bold">Total Attempts</span>
+                    <h3 className="text-3xl font-black text-white mt-1">{testHistory.length}</h3>
+                  </div>
+                  <div className="p-6 rounded-3xl glass-card border border-cyan-500/30 text-center">
+                    <span className="text-xs text-slate-400 font-bold">Accuracy</span>
+                    <h3 className="text-3xl font-black text-cyan-400 mt-1">88%</h3>
+                  </div>
+                  <div className="p-6 rounded-3xl glass-card border border-emerald-500/30 text-center">
+                    <span className="text-xs text-slate-400 font-bold">Target Readiness</span>
+                    <h3 className="text-3xl font-black text-emerald-400 mt-1">High</h3>
+                  </div>
+                </div>
+              </div>
+            )}
+
+          </main>
+
+          {/* EXAM SELECTOR MODAL */}
+          {isModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+              <div className="w-full max-w-3xl rounded-3xl glass-panel border border-cyan-500/30 p-6 space-y-6">
+                <div className="flex justify-between items-center border-b border-white/10 pb-4">
+                  <h3 className="text-xl font-bold text-white">Select Target Entrance Exam</h3>
+                  <button onClick={() => setIsModalOpen(false)} className="text-slate-400">✕</button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
+                  {EXAM_CATEGORIES.flatMap(c => c.exams).map(e => (
+                    <div
+                      key={e.id}
+                      onClick={() => { setCurrentExamId(e.id); setIsModalOpen(false); }}
+                      className={`p-4 rounded-2xl cursor-pointer border ${
+                        currentExamId === e.id ? 'border-cyan-400 bg-cyan-950/40 text-cyan-300' : 'border-white/10 bg-white/5 hover:border-white/20'
+                      }`}
+                    >
+                      <h4 className="font-bold text-white">{e.name}</h4>
+                      <p className="text-xs text-slate-400">{e.fullName}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+
+</body>
+</html>
